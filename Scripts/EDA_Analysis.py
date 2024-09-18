@@ -10,6 +10,13 @@ class EDA_Analysis:
         self.df_train = pd.read_csv(train_file)
         self.df_test = pd.read_csv(test_file)
        
+        # Strip any leading/trailing whitespace from column names
+        self.df_train.columns = self.df_train.columns.str.strip()
+        self.df_test.columns = self.df_test.columns.str.strip()
+        
+        # Print columns for debugging
+        print("Train columns:", self.df_train.columns)
+        print("Test columns:", self.df_test.columns)
         
         # Clean the Date column and convert to datetime
         self.df_train['Date'] = pd.to_datetime(self.df_train['Date'], errors='coerce')
@@ -19,6 +26,12 @@ class EDA_Analysis:
         self.df_train.dropna(subset=['Date'], inplace=True)
         self.df_test.dropna(subset=['Date'], inplace=True)
         
+        # Check if 'Store' is present in both datasets
+        if 'Store' in self.df_train.columns and 'Store' in self.df_test.columns:
+            self.df_merged = pd.merge(self.df_train, self.df_test[['Store', 'Promo']], on='Store', how='left')
+        else:
+            raise ValueError("Both datasets must contain the 'Store' column for merging.")
+
     def promo_distribution_comparison(self, save_path='../Images/promo_distribution_comparison.png'):
         """
         Compares the distribution of 'Promo' between training and test sets,
@@ -136,6 +149,7 @@ class EDA_Analysis:
 
         # Show the plot
         plt.show()
+
     def analyze_holiday_sales(self, holiday_dates, window_days=7, save_path='../Images/holiday_sales_comparison.png'):
         """
         Analyzes sales behavior around specified holidays.
@@ -200,6 +214,7 @@ class EDA_Analysis:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)  # Create the directory if it doesn't exist
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.show()
+
     def analyze_customers_sales_correlation(self, save_path='../Images/customers_sales_correlation.png'):
         """
         Analyzes the correlation between 'Customers' and 'Sales' in the training dataset,
@@ -231,4 +246,3 @@ class EDA_Analysis:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)  # Create the directory if it doesn't exist
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.show()
-
