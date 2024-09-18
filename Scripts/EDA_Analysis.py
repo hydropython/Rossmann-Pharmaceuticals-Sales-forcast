@@ -9,6 +9,7 @@ class EDA_Analysis:
         # Load train and test datasets
         self.df_train = pd.read_csv(train_file)
         self.df_test = pd.read_csv(test_file)
+       
         
         # Clean the Date column and convert to datetime
         self.df_train['Date'] = pd.to_datetime(self.df_train['Date'], errors='coerce')
@@ -135,3 +136,99 @@ class EDA_Analysis:
 
         # Show the plot
         plt.show()
+    def analyze_holiday_sales(self, holiday_dates, window_days=7, save_path='../Images/holiday_sales_comparison.png'):
+        """
+        Analyzes sales behavior around specified holidays.
+        
+        Parameters:
+        holiday_dates (list): List of holiday dates in 'YYYY-MM-DD' format.
+        window_days (int): Number of days before and after the holiday to analyze.
+        save_path (str): Path to save the comparison plot.
+        """
+        # Define a function to compute average sales around each holiday
+        def compute_average_sales(df, holiday_date, window_days):
+            start_date = holiday_date - timedelta(days=window_days)
+            end_date = holiday_date + timedelta(days=window_days)
+            
+            before_holiday = df[(df['Date'] >= start_date) & (df['Date'] < holiday_date)]
+            during_holiday = df[(df['Date'] == holiday_date)]
+            after_holiday = df[(df['Date'] > holiday_date) & (df['Date'] <= end_date)]
+            
+            avg_sales_before = before_holiday['Sales'].mean() if not before_holiday.empty else 0
+            avg_sales_during = during_holiday['Sales'].mean() if not during_holiday.empty else 0
+            avg_sales_after = after_holiday['Sales'].mean() if not after_holiday.empty else 0
+            
+            return avg_sales_before, avg_sales_during, avg_sales_after
+        
+        # Collect results for each holiday
+        results = []
+        for holiday in holiday_dates:
+            avg_sales_before, avg_sales_during, avg_sales_after = compute_average_sales(self.df_train, pd.to_datetime(holiday), window_days)
+            results.append({
+                'Holiday': holiday,
+                'Before Holiday': avg_sales_before,
+                'During Holiday': avg_sales_during,
+                'After Holiday': avg_sales_after
+            })
+        
+        # Convert results to DataFrame for plotting
+        results_df = pd.DataFrame(results)
+        results_df = results_df.melt(id_vars='Holiday', var_name='Period', value_name='Average Sales')
+
+        # Print numerical results
+        print("Numerical Results:")
+        for result in results:
+            print(f"Holiday: {result['Holiday']}")
+            print(f"  Average Sales Before Holiday: {result['Before Holiday']:.2f}")
+            print(f"  Average Sales During Holiday: {result['During Holiday']:.2f}")
+            print(f"  Average Sales After Holiday: {result['After Holiday']:.2f}\n")
+        
+        # Set seaborn style for modern aesthetics
+        sns.set_style("whitegrid")
+
+        # Create bar plot
+        plt.figure(figsize=(14, 8))
+        sns.barplot(x='Holiday', y='Average Sales', hue='Period', data=results_df, palette='viridis')
+        
+        # Titles and labels
+        plt.title('Sales Behavior Around Holidays', fontsize=16, fontweight='bold')
+        plt.xlabel('Holiday', fontsize=14)
+        plt.ylabel('Average Sales', fontsize=14)
+        plt.legend(title='Period')
+        
+        # Save and show plot
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)  # Create the directory if it doesn't exist
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.show()
+    def analyze_customers_sales_correlation(self, save_path='../Images/customers_sales_correlation.png'):
+        """
+        Analyzes the correlation between 'Customers' and 'Sales' in the training dataset,
+        prints the correlation coefficient, visualizes the correlation, and saves the plot.
+        """
+        # Check if 'Customers' and 'Sales' columns exist
+        if 'Customers' not in self.df_train.columns or 'Sales' not in self.df_train.columns:
+            raise ValueError("Columns 'Customers' and 'Sales' must exist in the training dataset.")
+
+        # Compute the correlation between 'Customers' and 'Sales'
+        correlation = self.df_train[['Customers', 'Sales']].corr().loc['Customers', 'Sales']
+
+        # Print the correlation result
+        print(f"Numerical Result: Correlation between Customers and Sales: {correlation:.4f}")
+
+        # Set seaborn style for modern aesthetics
+        sns.set_style("whitegrid")
+
+        # Create a scatter plot with regression line
+        plt.figure(figsize=(10, 6))
+        sns.regplot(x='Customers', y='Sales', data=self.df_train, scatter_kws={'color':'#2c7f3d'}, line_kws={'color':'#d4af37'})
+        
+        # Title and labels
+        plt.title('Correlation between Customers and Sales', fontsize=16, fontweight='bold')
+        plt.xlabel('Number of Customers', fontsize=14)
+        plt.ylabel('Sales', fontsize=14)
+        
+        # Save and show plot
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)  # Create the directory if it doesn't exist
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.show()
+
