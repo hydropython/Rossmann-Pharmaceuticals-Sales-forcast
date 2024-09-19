@@ -1,0 +1,42 @@
+2024-09-19 10:41:48,794 - INFO - Initializing EDA_Analysis with train_file: ../Data/train.csv and test_file: ../Data/test.csv
+2024-09-19 10:41:49,437 - INFO - Datasets loaded successfully.
+2024-09-19 10:41:49,437 - INFO - Whitespace stripped from column names.
+2024-09-19 10:41:49,519 - INFO - Date columns converted to datetime.
+2024-09-19 10:41:49,561 - INFO - Dropped rows with invalid Date values.
+2024-09-19 10:41:58,304 - INFO - Datasets merged successfully based on the 'Store' column.
+2024-09-19 10:41:58,304 - INFO - Starting promo distribution comparison.
+2024-09-19 10:41:58,336 - INFO - Promo distribution calculated for both train and test datasets.
+2024-09-19 10:41:59,049 - INFO - Promo distribution comparison plot saved at ../Images/promo_distribution_comparison.png.
+2024-09-19 10:41:59,225 - INFO - Initializing EDA_Analysis with train_file: ../Data/train.csv and test_file: ../Data/test.csv
+2024-09-19 10:41:59,730 - INFO - Datasets loaded successfully.
+2024-09-19 10:41:59,730 - INFO - Whitespace stripped from column names.
+2024-09-19 10:41:59,832 - INFO - Date columns converted to datetime.
+2024-09-19 10:41:59,883 - INFO - Dropped rows with invalid Date values.
+2024-09-19 10:42:08,625 - INFO - Datasets merged successfully based on the 'Store' column.
+2024-09-19 10:42:09,120 - INFO - Starting sales analysis around holidays.
+2024-09-19 10:42:12,646 - INFO - Sales around holidays calculated.
+2024-09-19 10:42:12,978 - INFO - Sales holidays comparison plot saved at ../Images/sales_holidays_comparison.png.
+2024-09-19 10:42:13,079 - INFO - Initializing EDA_Analysis with train_file: ../Data/train.csv and test_file: ../Data/test.csv
+2024-09-19 10:42:13,540 - INFO - Datasets loaded successfully.
+2024-09-19 10:42:13,540 - INFO - Whitespace stripped from column names.
+2024-09-19 10:42:13,615 - INFO - Date columns converted to datetime.
+2024-09-19 10:42:13,645 - INFO - Dropped rows with invalid Date values.
+2024-09-19 10:42:21,252 - INFO - Datasets merged successfully based on the 'Store' column.
+2024-09-19 10:43:59,987 - INFO - Initializing EDA_Analysis with train_file: ../Data/train.csv and test_file: ../Data/test.csv
+2024-09-19 10:44:00,525 - INFO - Datasets loaded successfully.
+2024-09-19 10:44:00,525 - INFO - Whitespace stripped from column names.
+2024-09-19 10:44:00,603 - INFO - Date columns converted to datetime.
+2024-09-19 10:44:00,654 - INFO - Dropped rows with invalid Date values.
+2024-09-19 10:44:07,303 - INFO - Datasets merged successfully based on the 'Store' column.
+2024-09-19 10:44:07,303 - INFO - Starting promo distribution comparison.
+2024-09-19 10:44:07,319 - INFO - Promo distribution calculated for both train and test datasets.
+2024-09-19 10:44:07,972 - INFO - Promo distribution comparison plot saved at ../Images/promo_distribution_comparison.png.
+2024-09-19 10:44:08,189 - INFO - Initializing EDA_Analysis with train_file: ../Data/train.csv and test_file: ../Data/test.csv
+2024-09-19 10:44:08,696 - INFO - Datasets loaded successfully.
+2024-09-19 10:44:08,696 - INFO - Whitespace stripped from column names.
+2024-09-19 10:44:08,763 - INFO - Date columns converted to datetime.
+2024-09-19 10:44:08,796 - INFO - Dropped rows with invalid Date values.
+2024-09-19 10:44:18,705 - INFO - Datasets merged successfully based on the 'Store' column.
+2024-09-19 10:44:19,351 - INFO - Starting sales analysis around holidays.
+2024-09-19 10:44:23,863 - INFO - Sales around holidays calculated.
+2024-09-19 10:44:24,204 - INFO - Sales holidays comparison plot saved at ../Images/sales_holidays_comparison.png.
