@@ -1,171 +1,170 @@
 import pandas as pd
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-import plotly.express as px
-import plotly.graph_objects as go
-import os
+import numpy as np
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.neighbors import KNeighborsRegressor
+import xgboost as xgb
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+import shap
 
-class Preprocessing:
-    
-    def __init__(self, train_file, test_file, submission_file, images_path='../Images/'):
-        # Load the data
-        self.df_train = pd.read_csv(train_file)
-        self.df_test = pd.read_csv(test_file)
-        self.df_submission = pd.read_csv(submission_file)
+class SalesPredictionPipeline:
+    def __init__(self, train_file, test_file, submission_file):
+        # Load the datasets
+        self.train_df = pd.read_csv(train_file)
+        self.test_df = pd.read_csv(test_file)
+        self.submission_df = pd.read_csv(submission_file)
 
-        # Merge df_test and df_submission on 'Id' to get 'Sales'
-        self.df_test = pd.merge(self.df_test, self.df_submission, on='Id', how='left')
+        # Define models
+        self.models = {
+            'RandomForest': RandomForestRegressor(),
+            'GradientBoosting': GradientBoostingRegressor(),
+            'XGBoost': xgb.XGBRegressor(),
+            'KNeighbors': KNeighborsRegressor()
+        }
 
-        # Create the images directory if it does not exist
-        self.images_path = images_path
-        os.makedirs(self.images_path, exist_ok=True)
-        print(f"Data successfully loaded and merged. Images will be saved to {self.images_path}")
+    def handle_missing_data(self):
+        """Handle missing data in train and test datasets"""
+        # Handle missing data in training set
+        self.train_df['Customers'].fillna(self.train_df['Customers'].mean(), inplace=True)
+        self.train_df['Promo'].fillna(0, inplace=True)  # Assuming missing Promo means no promo
         
+        # Handle missing data in test set
+        self.test_df['Open'].fillna(1, inplace=True)  # Assuming missing Open means store is open
+        
+        # Drop rows with too many missing values (if any)
+        self.train_df.dropna(subset=['Sales'], inplace=True)
+        
+        print("Missing data handled successfully.")
+
+    def merge_submission_data(self):
+        """Merge test data with submission data to get target Sales column"""
+        self.test_df = self.test_df.merge(self.submission_df[['Id', 'Sales']], on='Id', how='left')
+
     def feature_engineering(self):
-        """Extract features from date and other relevant information."""
-        # Convert 'Date' column to datetime
-        self.df_train['Date'] = pd.to_datetime(self.df_train['Date'])
-        self.df_test['Date'] = pd.to_datetime(self.df_test['Date'])
+        """Create new features such as Year, Month, and Day from Date, and drop the Date column"""
+        # Feature engineering for train data
+        self.train_df['Year'] = pd.to_datetime(self.train_df['Date']).dt.year
+        self.train_df['Month'] = pd.to_datetime(self.train_df['Date']).dt.month
+        self.train_df['Day'] = pd.to_datetime(self.train_df['Date']).dt.day
 
-        # Extract weekday and weekend features
-        self.df_train['Weekday'] = self.df_train['Date'].dt.dayofweek
-        self.df_train['Weekend'] = (self.df_train['Weekday'] >= 5).astype(int)
+        # Feature engineering for test data
+        self.test_df['Year'] = pd.to_datetime(self.test_df['Date']).dt.year
+        self.test_df['Month'] = pd.to_datetime(self.test_df['Date']).dt.month
+        self.test_df['Day'] = pd.to_datetime(self.test_df['Date']).dt.day
 
-        self.df_test['Weekday'] = self.df_test['Date'].dt.dayofweek
-        self.df_test['Weekend'] = (self.df_test['Weekday'] >= 5).astype(int)
+        # Drop the Date column
+        self.train_df.drop(columns=['Date'], inplace=True)
+        self.test_df.drop(columns=['Date'], inplace=True)
 
-        # Number of days to holidays (example: using a fixed holiday date)
-        holidays = pd.to_datetime(['2021-12-25', '2022-01-01'])  # Add your holidays
-        self.df_train['Days_to_Holiday'] = (holidays.min() - self.df_train['Date']).dt.days
-        self.df_test['Days_to_Holiday'] = (holidays.min() - self.df_test['Date']).dt.days
-
-        # Number of days after a holiday
-        self.df_train['Days_After_Holiday'] = (self.df_train['Date'] - holidays.max()).dt.days
-        self.df_test['Days_After_Holiday'] = (self.df_test['Date'] - holidays.max()).dt.days
-
-        # Beginning of the month, mid-month, and end of the month
-        self.df_train['Beginning_of_Month'] = (self.df_train['Date'].dt.day <= 10).astype(int)
-        self.df_train['Mid_of_Month'] = ((self.df_train['Date'].dt.day > 10) & (self.df_train['Date'].dt.day <= 20)).astype(int)
-        self.df_train['End_of_Month'] = (self.df_train['Date'].dt.day > 20).astype(int)
-
-        self.df_test['Beginning_of_Month'] = (self.df_test['Date'].dt.day <= 10).astype(int)
-        self.df_test['Mid_of_Month'] = ((self.df_test['Date'].dt.day > 10) & (self.df_test['Date'].dt.day <= 20)).astype(int)
-        self.df_test['End_of_Month'] = (self.df_test['Date'].dt.day > 20).astype(int)
-
-        # Additional features
-        self.df_train['Is_Holiday'] = self.df_train['Date'].isin(holidays).astype(int)
-        self.df_test['Is_Holiday'] = self.df_test['Date'].isin(holidays).astype(int)
-
-        print("Feature engineering completed. Updated dataframes:")
-        print(self.df_train.head())  # Display the first few rows of df_train
-        print(self.df_test.head())    # Display the first few rows of df_test
-
-    def handle_missing_values(self):
-        # Fill missing values for 'Open' with mode since it's binary
-        self.df_train['Open'].fillna(self.df_train['Open'].mode()[0], inplace=True)
-        self.df_test['Open'].fillna(self.df_test['Open'].mode()[0], inplace=True)
-
-        print("Missing values handled.")
-
-    def encode_categorical(self):
-        # Convert 'StateHoliday' to string type to ensure uniform encoding
-        self.df_train['StateHoliday'] = self.df_train['StateHoliday'].astype(str)
-        self.df_test['StateHoliday'] = self.df_test['StateHoliday'].astype(str)
-        
-        label_encoder = LabelEncoder()
-        
-        # Fit and transform categorical columns
-        self.df_train['StateHoliday'] = label_encoder.fit_transform(self.df_train['StateHoliday'])
-        self.df_test['StateHoliday'] = label_encoder.transform(self.df_test['StateHoliday'])
-        
-        print("Categorical variables encoded.")
-
-    def scale_numeric_features(self):
-        """Drop 'Customers' column from df_train and scale numeric features using StandardScaler."""
-        # Check if 'Customers' column exists in df_train and drop it if found
-        if 'Customers' in self.df_train.columns:
-            self.df_train.drop(columns=['Customers'], inplace=True)
-            print("'Customers' column dropped from df_train.")
-        else:
-            print("'Customers' column not found in df_train, skipping drop.")
-        
-        # Define numeric columns for scaling
-        numeric_columns = ['Open', 'Promo', 'SchoolHoliday', 'DayOfWeek']  # Modify as per your dataset
-
-        # Initialize the scaler
-        scaler = StandardScaler()
-
-        # Scale numeric columns in the training set
-        self.df_train[numeric_columns] = scaler.fit_transform(self.df_train[numeric_columns])
-
-        # Scale numeric columns in the test set
-        self.df_test[numeric_columns] = scaler.transform(self.df_test[numeric_columns])
-
-        print("Numeric features scaled.")
-    def visualize_sales_distribution(self):
-        # Visualize the sales distribution
-        fig = px.histogram(self.df_train, x='Sales', nbins=50, title="Sales Distribution", color_discrete_sequence=['green'])
-        
-        # Save the plot
-        fig.write_image(f"{self.images_path}/sales_distribution.png")
-        print(f"Sales distribution plot saved at {self.images_path}/sales_distribution.png")
-    
-    def visualize_sales_over_time(self):
-        # Convert 'Date' to datetime format if it's not already
-        self.df_train['Date'] = pd.to_datetime(self.df_train['Date'])
-        
-        # Group by date and plot sales trend over time
-        sales_over_time = self.df_train.groupby('Date')['Sales'].sum().reset_index()
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=sales_over_time['Date'], y=sales_over_time['Sales'],
-                                 mode='lines', name='Total Sales', line=dict(color='blue')))
-        fig.update_layout(title='Sales Over Time', xaxis_title='Date', yaxis_title='Sales')
-
-        # Save the plot
-        fig.write_image(f"{self.images_path}/sales_over_time.png")
-        print(f"Sales over time plot saved at {self.images_path}/sales_over_time.png")
-
-    def scale_data(self):
-        """Scale only the numeric columns in the training and test datasets."""
-        # Initialize the scaler
-        scaler = StandardScaler()
-
-        # Select only numeric columns (excluding datetime and object columns)
-        numeric_columns = self.df_train.select_dtypes(include=['float64', 'int64']).columns
-
-        # Scale numeric columns in the training set
-        X_train_scaled = scaler.fit_transform(self.df_train[numeric_columns])
-
-        # Scale numeric columns in the test set
-        X_test_scaled = scaler.transform(self.df_test[numeric_columns])
-
-        print("Numeric features scaled successfully.")
-
-        return X_train_scaled, X_test_scaled
+        print("Feature engineering completed.")
 
     def preprocess(self):
-        """Preprocess data and return scaled features and target variables."""
-        
-        # Assuming 'Sales' is the target column in the dataset
-        target_column = 'Sales'  # Replace 'target_column' with 'Sales' (or the correct target name)
-        
-        # Drop the target column from features
-        X_train = self.df_train.drop(columns=[target_column])
-        y_train = self.df_train[target_column]
-        
-        X_val = self.df_test.drop(columns=[target_column])
-        y_val = self.df_test[target_column]
-        
-        # Define numeric columns for scaling
-        numeric_columns = ['Open', 'Promo', 'SchoolHoliday', 'DayOfWeek']  # Modify as per your dataset
-        
-        # Initialize the scaler
-        scaler = StandardScaler()
-        
-        # Scale numeric columns in the training and validation sets
-        X_train_scaled = scaler.fit_transform(X_train[numeric_columns])
-        X_val_scaled = scaler.transform(X_val[numeric_columns])
-        
-        print("Numeric features scaled.")
-        
-        return X_train_scaled, X_val_scaled, y_train, y_val  # Return 4 values
+        """Perform preprocessing including feature scaling and encoding"""
+        # Separate features and target variable from train data
+        X = self.train_df.drop(columns=['Sales', 'Customers'])  # Dropping Customers as it's highly correlated with Sales
+        y = self.train_df['Sales']
+
+        # Split into training and validation sets
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        # Preprocessing pipeline for numerical and categorical features
+        numeric_features = ['Store', 'DayOfWeek', 'Promo', 'SchoolHoliday', 'Year', 'Month', 'Day']
+        categorical_features = ['StateHoliday']
+
+        numeric_transformer = Pipeline(steps=[('imputer', SimpleImputer(strategy='mean')), ('scaler', StandardScaler())])
+        categorical_transformer = Pipeline(steps=[('imputer', SimpleImputer(strategy='most_frequent')), 
+                                                  ('onehot', OneHotEncoder(handle_unknown='ignore'))])
+
+        preprocessor = ColumnTransformer(
+            transformers=[('num', numeric_transformer, numeric_features),
+                          ('cat', categorical_transformer, categorical_features)])
+
+        # Fit and transform the training data
+        X_train_scaled = preprocessor.fit_transform(X_train)
+        X_val_scaled = preprocessor.transform(X_val)
+
+        print("Preprocessing completed.")
+
+        return X_train_scaled, X_val_scaled, y_train, y_val, preprocessor
+
+    def train_without_tuning(self, X_train, y_train, X_val, y_val):
+        """Train models without hyperparameter tuning and evaluate on validation data with RMSE, MSE, and MAE"""
+        metrics = {}
+
+        for model_name, model in self.models.items():
+            print(f"Training {model_name} without tuning...")
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_val)
+
+            rmse = np.sqrt(mean_squared_error(y_val, y_pred))
+            mse = mean_squared_error(y_val, y_pred)
+            mae = mean_absolute_error(y_val, y_pred)
+
+            metrics[model_name] = {'RMSE': rmse, 'MSE': mse, 'MAE': mae}
+            print(f"{model_name} - RMSE: {rmse}, MSE: {mse}, MAE: {mae}")
+
+        return metrics
+
+    def hyperparameter_tuning(self, X_train, y_train):
+        """Perform hyperparameter tuning using RandomizedSearchCV for all models"""
+        param_grids = {
+            'RandomForest': {
+                'n_estimators': [100, 200],
+                'max_depth': [None, 10, 20],
+                'min_samples_split': [2, 5],
+                'min_samples_leaf': [1, 2],
+            },
+            'GradientBoosting': {
+                'n_estimators': [100, 200],
+                'learning_rate': [0.1, 0.01],
+                'max_depth': [3, 5, 10]
+            },
+            'XGBoost': {
+                'n_estimators': [100, 200],
+                'learning_rate': [0.1, 0.01],
+                'max_depth': [3, 5, 10]
+            },
+            'KNeighbors': {
+                'n_neighbors': [3, 5, 10],
+                'weights': ['uniform', 'distance']
+            }
+        }
+
+        best_models = {}
+
+        for model_name, model in self.models.items():
+            print(f"Tuning {model_name}...")
+            random_search = RandomizedSearchCV(estimator=model, param_distributions=param_grids[model_name],
+                                               n_iter=10, cv=3, scoring='neg_mean_squared_error', n_jobs=-1, verbose=1)
+            random_search.fit(X_train, y_train)
+            best_models[model_name] = random_search.best_estimator_
+            print(f"Best parameters for {model_name}: {random_search.best_params_}")
+
+        return best_models
+
+    def evaluate_model(self, X_val, y_val, models):
+        """Evaluate the performance of models on validation data using RMSE, MSE, and MAE"""
+        metrics = {}
+        for name, model in models.items():
+            y_pred = model.predict(X_val)
+
+            rmse = np.sqrt(mean_squared_error(y_val, y_pred))
+            mse = mean_squared_error(y_val, y_pred)
+            mae = mean_absolute_error(y_val, y_pred)
+
+            metrics[name] = {'RMSE': rmse, 'MSE': mse, 'MAE': mae}
+            print(f"{name} - RMSE: {rmse}, MSE: {mse}, MAE: {mae}")
+
+        return metrics
+
+    def model_interpretation(self, model, X_val_scaled):
+        """Perform model interpretation using SHAP values"""
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X_val_scaled)
+
+        print("Plotting SHAP summary plot...")
+        shap.summary_plot(shap_values, X_val_scaled)
